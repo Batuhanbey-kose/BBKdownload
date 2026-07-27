@@ -1,0 +1,31 @@
+name: Özellik önerisi
+description: BBKdownload için geliştirme önerisi paylaşın
+title: "[Öneri]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: İhtiyaç
+      description: Hangi sorunu çözmek istediğinizi açıklayın.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Önerilen çözüm
+      description: Beklediğiniz davranışı kısa ve açık biçimde anlatın.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatifler
+      description: Değerlendirdiğiniz başka çözümler varsa ekleyin.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Kapsam kontrolü
+      options:
+        - label: Öneri DRM, özel hesap veya erişim koruması aşmayı amaçlamıyor.
+          required: true

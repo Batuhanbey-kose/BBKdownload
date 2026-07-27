@@ -1,0 +1,25 @@
+<svg width="760" height="138" viewBox="0 0 760 138" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="button" x1="24" y1="16" x2="738" y2="126" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0891B2"/>
+      <stop offset="0.48" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-80%" width="140%" height="260%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="5" y="5" width="750" height="128" rx="34" fill="#0B1120" stroke="url(#button)" stroke-width="10"/>
+  <rect x="19" y="19" width="722" height="100" rx="24" fill="url(#button)" fill-opacity="0.16"/>
+  <g filter="url(#glow)">
+    <path d="M78 34V78M58 63L78 84L98 63M53 99H103" stroke="#E6FDFF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+      <animateTransform attributeName="transform" type="translate" values="0 0;0 5;0 0" dur="1.4s" repeatCount="indefinite"/>
+    </path>
+  </g>
+  <text x="410" y="65" fill="#F8FAFC" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="38" font-weight="900" text-anchor="middle">TELEFONA İNDİR</text>
+  <text x="410" y="95" fill="#A5F3FC" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="600" letter-spacing="1.4" text-anchor="middle">BBKdownload.apk · ANDROID 10+ · ARM64</text>
+  <circle cx="700" cy="69" r="8" fill="#5EEAD4">
+    <animate attributeName="opacity" values="0.25;1;0.25" dur="1.6s" repeatCount="indefinite"/>
+  </circle>
+</svg>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BBKdownload</string>
+    <string name="app_subtitle">Bağlantıyı bırak, medyanı telefonuna al.</string>
+    <string name="platforms">YouTube  •  X  •  TikTok  •  Instagram  •  Reddit  •  Facebook</string>
+    <string name="links_title">01  BAĞLANTILAR</string>
+    <string name="links_hint">Her satıra bir video veya gönderi bağlantısı</string>
+    <string name="paste">Yapıştır</string>
+    <string name="clear">Temizle</string>
+    <string name="settings_title">02  İNDİRME AYARLARI</string>
+    <string name="mode_video">VİDEO</string>
+    <string name="mode_audio">MP3</string>
+    <string name="mode_image">KAPAK</string>
+    <string name="quality">Kalite</string>
+    <string name="theme">Tema</string>
+    <string name="session_title">İsteğe bağlı platform oturumu</string>
+    <string name="session_none">Açık içerikler için oturum gerekmez</string>
+    <string name="session_saved">%1$s oturumu hazır</string>
+    <string name="open_session">Gerekirse Aç</string>
+    <string name="delete_session">Sil</string>
+    <string name="playlist">Liste/profil bağlantısındaki ilk 100 öğeyi de indir</string>
+    <string name="status_ready">Bağlantıları bekliyor</string>
+    <string name="status_detail_ready">Dosyalar İndirilenler/BBKdownload klasörüne kaydedilir.</string>
+    <string name="status_service_starting">Servis başlatılıyor</string>
+    <string name="status_engine_preparing">İndirme motoru hazırlanıyor…</string>
+    <string name="start_download">İNDİRMEYİ BAŞLAT</string>
+    <string name="cancel">İptal</string>
+    <string name="legal_note">Yalnızca size ait veya indirme izniniz bulunan içerikleri kullanın. Uygulama özel hesap, DRM veya ücretli içerik korumasını aşmaz.</string>
+    <string name="watermark_note">Kaynağın sunduğu en temiz dosya kaydedilir; uygulama sonradan filigran silmez. Kapak modu gönderinin küçük resmini kaydeder.</string>
+    <string name="login_title">%1$s Oturumu</string>
+    <string name="login_help">Platformda giriş yapın, ardından aşağıdaki “Oturumu Kaydet” düğmesine dokunun.</string>
+    <string name="login_blocked_origin">Güvenilmeyen yönlendirme engellendi</string>
+    <string name="save_session">OTURUMU KAYDET</string>
+    <string name="close">Kapat</string>
+    <string name="notification_channel">Medya indirmeleri</string>
+    <string name="notification_channel_description">Etkin indirmelerin ilerlemesini gösterir</string>
+    <string name="notification_preparing">İndirme hazırlanıyor</string>
+    <string name="notification_complete">İndirme tamamlandı</string>
+    <string name="notification_failed">İndirme tamamlanamadı</string>
+    <string name="notification_open_for_details">Ayrıntılar için uygulamayı açın</string>
+</resources>

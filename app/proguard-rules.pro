@@ -1,0 +1,7 @@
+-keep class com.yausername.youtubedl_android.** { *; }
+-keep class com.yausername.ffmpeg.** { *; }
+-keep class org.apache.commons.compress.** { *; }
+-keep class org.apache.commons.io.** { *; }
+-keep class com.fasterxml.jackson.** { *; }
+-keepattributes Signature,InnerClasses,EnclosingMethod
+-renamesourcefileattribute SourceFile

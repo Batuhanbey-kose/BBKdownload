@@ -1,0 +1,106 @@
+<svg width="1440" height="560" viewBox="0 0 1440 560" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="30" x2="1370" y2="550" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#090D18"/>
+      <stop offset="0.48" stop-color="#11182A"/>
+      <stop offset="1" stop-color="#080B13"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="210" y1="130" x2="470" y2="425" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/>
+      <stop offset="0.55" stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#A7F3D0"/>
+    </linearGradient>
+    <linearGradient id="warm" x1="310" y1="280" x2="445" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FDE68A"/>
+      <stop offset="0.45" stop-color="#FB923C"/>
+      <stop offset="1" stop-color="#F43F5E"/>
+    </linearGradient>
+    <linearGradient id="title" x1="560" y1="175" x2="1110" y2="330" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FAFC"/>
+      <stop offset="0.52" stop-color="#DDFDFF"/>
+      <stop offset="1" stop-color="#67E8F9"/>
+    </linearGradient>
+    <radialGradient id="orbCyan">
+      <stop stop-color="#22D3EE" stop-opacity="0.8"/>
+      <stop offset="1" stop-color="#22D3EE" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="orbPurple">
+      <stop stop-color="#7C3AED" stop-opacity="0.68"/>
+      <stop offset="1" stop-color="#7C3AED" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="28"/>
+    </filter>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="8" result="blurred"/>
+      <feMerge><feMergeNode in="blurred"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="22" stdDeviation="24" flood-color="#000" flood-opacity="0.55"/>
+    </filter>
+    <clipPath id="frame"><rect width="1440" height="560" rx="34"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <rect width="1440" height="560" fill="url(#bg)"/>
+    <path d="M0 104H1440M0 280H1440M0 456H1440M176 0V560M496 0V560M816 0V560M1136 0V560" stroke="#94A3B8" stroke-opacity="0.055"/>
+
+    <circle cx="55" cy="78" r="210" fill="url(#orbCyan)" filter="url(#blur)">
+      <animate attributeName="cx" values="55;120;55" dur="9s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.55;0.9;0.55" dur="5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="1325" cy="490" r="250" fill="url(#orbPurple)" filter="url(#blur)">
+      <animate attributeName="cy" values="490;410;490" dur="11s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="1165" cy="75" r="100" fill="url(#orbCyan)" filter="url(#blur)" opacity="0.25">
+      <animate attributeName="r" values="85;125;85" dur="7s" repeatCount="indefinite"/>
+    </circle>
+
+    <g opacity="0.45">
+      <path d="M1115 92L1265 92" stroke="#22D3EE" stroke-width="3" stroke-linecap="round" stroke-dasharray="10 12">
+        <animate attributeName="stroke-dashoffset" values="0;-44" dur="2.2s" repeatCount="indefinite"/>
+      </path>
+      <path d="M105 470L260 470" stroke="#FB923C" stroke-width="3" stroke-linecap="round" stroke-dasharray="10 12">
+        <animate attributeName="stroke-dashoffset" values="0;44" dur="2.2s" repeatCount="indefinite"/>
+      </path>
+    </g>
+
+    <g filter="url(#shadow)">
+      <rect x="170" y="92" width="330" height="376" rx="78" fill="#11163A"/>
+      <rect x="174" y="96" width="322" height="368" rx="74" stroke="url(#cyan)" stroke-width="8" stroke-opacity="0.75"/>
+      <rect x="195" y="117" width="280" height="326" rx="58" fill="#0A0E24" fill-opacity="0.72"/>
+    </g>
+
+    <g filter="url(#glow)">
+      <path d="M249 185V351M250 194H331C369 194 392 211 392 239C392 267 369 282 331 282H250M250 282H343C382 282 405 299 405 327C405 358 381 376 341 376H250" stroke="url(#cyan)" stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M339 245L384 279L339 313V245Z" fill="#F8FAFC" stroke="#CFFAFE" stroke-width="4"/>
+      <path d="M384 307H411V356H438L397.5 409L357 356H384V307Z" fill="url(#warm)"/>
+    </g>
+
+    <g>
+      <text x="560" y="218" fill="url(#title)" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="76" font-weight="800" letter-spacing="-3">BBKdownload</text>
+      <text x="565" y="269" fill="#94A3B8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="23" font-weight="500" letter-spacing="1.1">PRIVATE. LOCAL. YOUR MEDIA.</text>
+      <rect x="562" y="304" width="600" height="2" rx="1" fill="#334155"/>
+      <rect x="562" y="304" width="190" height="2" rx="1" fill="#22D3EE">
+        <animate attributeName="x" values="562;972;562" dur="4.8s" repeatCount="indefinite"/>
+      </rect>
+      <text x="565" y="354" fill="#CBD5E1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="21">Android üzerinde video, MP3 ve kapak arşivleme.</text>
+
+      <g font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700">
+        <rect x="562" y="386" width="132" height="42" rx="21" fill="#22D3EE" fill-opacity="0.1" stroke="#22D3EE" stroke-opacity="0.42"/>
+        <text x="587" y="412" fill="#67E8F9">ANDROID 10+</text>
+        <rect x="710" y="386" width="104" height="42" rx="21" fill="#2DD4BF" fill-opacity="0.1" stroke="#2DD4BF" stroke-opacity="0.42"/>
+        <text x="738" y="412" fill="#5EEAD4">ARM64</text>
+        <rect x="830" y="386" width="142" height="42" rx="21" fill="#A78BFA" fill-opacity="0.1" stroke="#A78BFA" stroke-opacity="0.42"/>
+        <text x="856" y="412" fill="#C4B5FD">NO TRACKING</text>
+        <rect x="988" y="386" width="152" height="42" rx="21" fill="#FB923C" fill-opacity="0.1" stroke="#FB923C" stroke-opacity="0.42"/>
+        <text x="1016" y="412" fill="#FDBA74">OPEN SOURCE</text>
+      </g>
+    </g>
+
+    <circle cx="1374" cy="74" r="5" fill="#22D3EE">
+      <animate attributeName="opacity" values="0.2;1;0.2" dur="1.8s" repeatCount="indefinite"/>
+    </circle>
+    <text x="1346" y="105" fill="#64748B" font-family="monospace" font-size="13" text-anchor="middle">v0.1.4</text>
+  </g>
+</svg>
