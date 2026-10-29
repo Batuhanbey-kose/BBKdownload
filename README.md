@@ -49,7 +49,16 @@ Desteklenen bağlantılar: **YouTube, X/Twitter, TikTok, Instagram, Reddit, Face
 
 Dosyalar telefonundaki `İndirilenler/BBKdownload` klasörüne gelir. Bağlantıyı başka bir uygulamadan **Paylaş > BBKdownload** diyerek de gönderebilirsin.
 
-Uygulama içinden seçilebilen 10 tema vardır: **Neon BBK, Zümrüt, Mor Gece, Gün Batımı, Okyanus, Gül, Siyah Beyaz, Matrix, Cyber Sarı ve Buz**. Seçimin telefonda saklanır.
+### 0.2.0 Güncellemesi
+
+- **16 tema:** Mevcut temalara AMOLED, Kuzey, Kiraz ve açık renkli Kağıt, Latte, Lavanta eklendi. Oturum ekranı ve açılır menüler de seçilen temaya uyar.
+- **Kolay oturum:** Bağlantı eklemeden **Oturum Aç** ile platform seçilebilir. Giriş tamamlanınca oturum otomatik kaydedilir; elle kaydetme seçeneği de vardır.
+- **Daha dayanıklı indirme:** Resmi yt-dlp **2026.10.26**, APK güncellemesinde eski motorun SHA-256 doğrulamasıyla yenilenmesi, geçici ağ hatalarında en fazla üç deneme ve kalite sınırını koruyan uyumlu biçim seçimi.
+- **Kuyruk yönetimi:** Bir bağlantı hata verse de diğerleri devam eder. **Başarısızları Tekrar Dene**, yalnızca hata veren bağlantıları aynı ayarlarla sıraya alır. Liste/profil bağlantısı tekrar denenirse o bağlantıdaki öğeler yeniden işlenebilir.
+- **Küçük kolaylıklar:** Kalite/mod/liste ayarları hatırlanır; benzersiz bağlantı sayısı, indirilenleri açma ve gizlenebilir teknik ayrıntılar bulunur.
+- **Düzeltmeler:** Kapak dönüştürmede FFmpeg hazırlanır; birleştirilmemiş ses/video parçaları İndirilenler klasörüne taşınmaz. Android 15+ sistem çubukları ve klavye boşlukları ele alınır.
+
+Bu yenilikler `main` dalındaki **0.2.0 kaynak sürümündedir**. Yukarıdaki hazır imzalı APK bağlantısı **0.1.4** sürümüne aittir. Güncel deneme APK'sı, başarılı [Android Verify](https://github.com/Batuhanbey-kose/BBKdownload/actions/workflows/android.yml) çalışmasının **Artifacts → BBKdownload-debug-arm64** bölümünden alınabilir; deneme paketi ayrı uygulama olarak kurulur.
 
 ## Güvenli mi?
 
@@ -62,7 +71,7 @@ Uygulama içinden seçilebilen 10 tema vardır: **Neon BBK, Zümrüt, Mor Gece, 
 ## Özel Hesaplar
 
 - Herkese açık içerikler oturum açmadan indirilebilir.
-- Özel hesaptaki bir içerik yalnızca o hesabı takip eden ve içeriği görme izni bulunan kullanıcı kendi hesabıyla **Gerekirse Aç** bölümünden oturum açarsa işlenebilir.
+- Özel hesaptaki bir içerik yalnızca o hesabı takip eden ve içeriği görme izni bulunan kullanıcı kendi hesabıyla **Oturum Aç** bölümünden oturum açarsa işlenebilir.
 - İçerik oturum açıldıktan sonra platformda görünmüyorsa BBKdownload da içeriği göremez ve indiremez.
 - Uygulama özel hesap, erişim izni, DRM veya ücretli içerik korumasını aşmaz.
 
@@ -84,7 +93,7 @@ Hazır sürüm ve checksum: **[BBKdownload v0.1.4](https://github.com/Batuhanbey
 | Dil | Kotlin 2.1.20 |
 | Android | minSdk 29, targetSdk 35 |
 | İndirme motoru | youtubedl-android 0.18.1 |
-| Extractor | Sabit yt-dlp 2026.07.04 |
+| Extractor | SHA-256 doğrulanan yt-dlp 2026.10.26 |
 | Medya | Paket içi FFmpeg + QuickJS |
 | Depolama | Scoped Storage + MediaStore |
 | ABI | arm64-v8a |
@@ -92,7 +101,7 @@ Hazır sürüm ve checksum: **[BBKdownload v0.1.4](https://github.com/Batuhanbey
 Paketlenen `yt-dlp` SHA-256:
 
 ```text
-495be29ff4d9d4e9be7eabdfef225221e5d5282e77f2f505abc6dca80349f3fd
+e51e69e89489f199530f13d32a4342da3ddb2cf34842f364603a066db05afbf3
 ```
 
 ### Akış

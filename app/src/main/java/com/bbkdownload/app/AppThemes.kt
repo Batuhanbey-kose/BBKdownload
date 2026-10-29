@@ -29,6 +29,12 @@ object AppThemes {
         palette("matrix", "Matrix", "#020A05", "#06140B", "#0B1F12", "#14532D", "#DCFCE7", "#86EFAC", "#22C55E", "#4ADE80", "#166534", "#F97316"),
         palette("cyber", "Cyber Sarı", "#111005", "#1F1C0A", "#2D2810", "#665C16", "#FEFCE8", "#FDE68A", "#FACC15", "#EAB308", "#713F12", "#EF4444"),
         palette("ice", "Buz", "#06111A", "#0D1B2A", "#132A3E", "#2B5876", "#F0FDFA", "#A5F3FC", "#67E8F9", "#5EEAD4", "#155E75", "#F472B6"),
+        palette("amoled", "AMOLED", "#000000", "#080808", "#121212", "#343434", "#FFFFFF", "#C8CBD2", "#9299A5", "#A3E635", "#253710", "#FDA4AF"),
+        palette("nord", "Kuzey", "#202630", "#2A3240", "#333E4E", "#526278", "#ECEFF4", "#D8DEE9", "#AEBCCC", "#88C0D0", "#30525F", "#E9A0AA"),
+        palette("cherry", "Kiraz", "#170914", "#271120", "#371B2E", "#62354E", "#FFF1F5", "#F4BDCD", "#CC93AB", "#FF7BAC", "#6B2042", "#FDD780"),
+        palette("paper", "Kağıt", "#F4F6FA", "#FFFFFF", "#E9EDF5", "#B8C3D5", "#162238", "#435572", "#566882", "#075EAB", "#D8EAFE", "#B42340"),
+        palette("latte", "Latte", "#F7F1E8", "#FFFCF6", "#EFE4D5", "#CCBBA4", "#30271F", "#66513D", "#79634D", "#80502A", "#EBD7BF", "#AC2440"),
+        palette("lavender", "Lavanta", "#F5F0FF", "#FEFCFF", "#EBE1FA", "#C6B5DC", "#2C1C41", "#5F477B", "#715987", "#7141A8", "#E7D6FA", "#B42357"),
     )
 
     val default = all.first()

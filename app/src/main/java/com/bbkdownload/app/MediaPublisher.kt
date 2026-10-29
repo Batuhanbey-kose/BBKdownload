@@ -20,16 +20,13 @@ object MediaPublisher {
     fun publishAll(
         context: Context,
         stagingDirectory: File,
+        mode: DownloadMode,
         allowEmpty: Boolean = false,
         shouldCancel: () -> Boolean = { false },
     ): Int {
         val files = stagingDirectory.walkTopDown()
             .filter { file ->
-                file.isFile &&
-                    file.length() > 0 &&
-                    !file.name.endsWith(".part", ignoreCase = true) &&
-                    !file.name.endsWith(".ytdl", ignoreCase = true) &&
-                    !file.name.startsWith(".medya-")
+                file.isFile && file.length() > 0 && isFinishedMedia(file.name, mode)
             }
             .toList()
         if (files.isEmpty()) {
@@ -39,8 +36,8 @@ object MediaPublisher {
 
         var published = 0
         files.forEach { file ->
-            if (shouldCancel()) throw MediaCopyCancelledException()
             try {
+                if (shouldCancel()) throw MediaCopyCancelledException()
                 publish(context, file, shouldCancel)
                 published++
             } catch (error: Throwable) {
@@ -49,6 +46,17 @@ object MediaPublisher {
             }
         }
         return published
+    }
+
+    internal fun isFinishedMedia(name: String, mode: DownloadMode): Boolean {
+        val lower = name.lowercase()
+        if (lower.startsWith(".") || Regex("""\.(?:f\d+|temp|part|frag\d+)(?:\.|$)""").containsMatchIn(lower)) return false
+        val extension = lower.substringAfterLast('.', "")
+        return when (mode) {
+            DownloadMode.VIDEO -> extension in setOf("mp4", "mkv", "webm", "mov", "m4v")
+            DownloadMode.AUDIO -> extension == "mp3"
+            DownloadMode.IMAGE -> extension in setOf("jpg", "jpeg")
+        }
     }
 
     private fun publish(context: Context, source: File, shouldCancel: () -> Boolean) {

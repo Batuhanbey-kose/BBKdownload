@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/loginRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
@@ -35,6 +36,7 @@
     </LinearLayout>
 
     <TextView
+        android:id="@+id/loginHelp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/panel"
@@ -54,6 +56,23 @@
         android:padding="7dp"
         android:textColor="@color/accent"
         android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/loginStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="10dp"
+        android:text="@string/login_waiting"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/reloadButton"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/reload_page"
+        android:visibility="gone" />
 
     <com.google.android.material.progressindicator.LinearProgressIndicator
         android:id="@+id/pageProgress"

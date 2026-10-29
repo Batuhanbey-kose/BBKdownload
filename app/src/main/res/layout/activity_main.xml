@@ -154,6 +154,14 @@
                     android:text="@string/clear"
                     android:textColor="@color/text_secondary" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/linkCount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -241,13 +249,12 @@
                 android:layout_marginTop="14dp"
                 android:background="@color/panel_alt"
                 android:gravity="center_vertical"
-                android:orientation="horizontal"
+                android:orientation="vertical"
                 android:padding="12dp">
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:orientation="vertical">
 
                     <TextView
@@ -269,22 +276,29 @@
                         android:textSize="11sp" />
                 </LinearLayout>
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/sessionButton"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/open_session"
-                    android:textColor="@color/accent"
-                    app:strokeColor="@color/accent" />
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/deleteSessionButton"
-                    style="@style/Widget.MaterialComponents.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/delete_session"
-                    android:textColor="@color/error" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/sessionButton"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/open_session"
+                        android:textColor="@color/accent"
+                        app:strokeColor="@color/accent" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/deleteSessionButton"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/delete_session"
+                        android:textColor="@color/error" />
+                </LinearLayout>
             </LinearLayout>
 
             <com.google.android.material.checkbox.MaterialCheckBox
@@ -355,7 +369,15 @@
                 android:fontFamily="monospace"
                 android:maxLines="7"
                 android:textColor="@color/text_faint"
+                android:visibility="gone"
                 android:textSize="11sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/logToggleButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/show_logs" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -384,7 +406,32 @@
                     android:textColor="@color/error"
                     app:strokeColor="@color/error" />
             </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/retryButton"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/retry_failed"
+                android:visibility="gone" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/downloadsButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/open_downloads" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/engineVersion"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center"
+            android:textColor="@color/text_faint"
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/legalText"

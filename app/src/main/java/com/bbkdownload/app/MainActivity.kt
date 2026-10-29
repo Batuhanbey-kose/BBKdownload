@@ -1,8 +1,8 @@
 package com.bbkdownload.app
 
 import android.Manifest
+import android.app.DownloadManager
 import android.content.res.ColorStateList
-import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -10,7 +10,10 @@ import android.content.pm.PackageManager
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
+import android.view.View
+import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -23,6 +26,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.bbkdownload.app.databinding.ActivityMainBinding
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.launch
 
@@ -30,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val qualityOptions = listOf("En iyi", "2160p", "1440p", "1080p", "720p", "480p")
     private val themeOptions = AppThemes.all.map { it.label }
+    private var sessionBusy = false
     private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -43,12 +48,17 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        AppAppearance.installInsets(this, binding.root)
 
         setupQualityMenu()
         setupThemeMenu()
+        restoreDownloadSettings()
         setupActions()
         observeDownloadState()
-        consumeShareIntent(intent)
+        if (savedInstanceState == null) consumeShareIntent(intent)
+        binding.engineVersion.text = getString(
+            R.string.engine_version, packageManager.getPackageInfo(packageName, 0).versionName, BundledEngine.VERSION,
+        )
         requestNotificationPermission()
     }
 
@@ -65,22 +75,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupQualityMenu() {
         binding.qualityInput.setAdapter(
-            ArrayAdapter(this, android.R.layout.simple_list_item_1, qualityOptions),
+            themedAdapter(qualityOptions),
         )
-        binding.qualityInput.setText(qualityOptions.first(), false)
+        val saved = AppPreferences.store(this).getString(PREF_QUALITY, qualityOptions.first())
+        binding.qualityInput.setText(saved.takeIf { it in qualityOptions } ?: qualityOptions.first(), false)
+        binding.qualityInput.setOnItemClickListener { _, _, _, _ -> saveDownloadSettings() }
     }
 
     private fun setupThemeMenu() {
         binding.themeInput.setAdapter(
-            ArrayAdapter(this, android.R.layout.simple_list_item_1, themeOptions),
+            themedAdapter(themeOptions),
         )
-        val savedTheme = getPreferences(MODE_PRIVATE).getString(PREF_THEME_ID, AppThemes.default.id)
-        val theme = AppThemes.byId(savedTheme)
+        val theme = AppPreferences.theme(this)
         binding.themeInput.setText(theme.label, false)
         applyTheme(theme)
         binding.themeInput.setOnItemClickListener { _, _, _, _ ->
             val selected = AppThemes.byLabel(binding.themeInput.text.toString())
-            getPreferences(MODE_PRIVATE).edit { putString(PREF_THEME_ID, selected.id) }
+            AppPreferences.saveTheme(this, selected)
             applyTheme(selected)
         }
     }
@@ -94,12 +105,64 @@ class MainActivity : AppCompatActivity() {
         }
         binding.sessionButton.setOnClickListener { openSession() }
         binding.deleteSessionButton.setOnClickListener { deleteSession() }
-        binding.urlInput.doAfterTextChanged { updateSessionStatus() }
+        binding.retryButton.setOnClickListener {
+            DownloadStateStore.state.value.retryConfig?.let(::launchDownload)
+        }
+        binding.downloadsButton.setOnClickListener {
+            try {
+                startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS))
+            } catch (_: Exception) {
+                toast("Dosyalar uygulamasından İndirilenler/BBKdownload klasörünü açın.")
+            }
+        }
+        binding.logToggleButton.setOnClickListener {
+            val show = binding.logText.visibility != View.VISIBLE
+            binding.logText.visibility = if (show) View.VISIBLE else View.GONE
+            binding.logToggleButton.setText(if (show) R.string.hide_logs else R.string.show_logs)
+        }
+        binding.urlInput.doAfterTextChanged {
+            binding.urlInputLayout.error = null
+            updateSessionStatus()
+            updateLinkCount()
+        }
         binding.modeGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
             val videoMode = checkedId == binding.modeVideoButton.id
-            binding.qualityInputLayout.isEnabled = videoMode
+            binding.qualityInputLayout.isEnabled = videoMode && !DownloadStateStore.state.value.running
+            saveDownloadSettings()
         }
+        binding.playlistCheck.setOnCheckedChangeListener { _, _ -> saveDownloadSettings() }
+        updateLinkCount()
+    }
+
+    private fun restoreDownloadSettings() {
+        val preferences = AppPreferences.store(this)
+        val button = when (preferences.getString(PREF_MODE, DownloadMode.VIDEO.name)) {
+            DownloadMode.AUDIO.name -> binding.modeAudioButton.id
+            DownloadMode.IMAGE.name -> binding.modeImageButton.id
+            else -> binding.modeVideoButton.id
+        }
+        binding.modeGroup.check(button)
+        binding.playlistCheck.isChecked = preferences.getBoolean(PREF_COLLECTION, false)
+    }
+
+    private fun selectedMode(): DownloadMode = when (binding.modeGroup.checkedButtonId) {
+        binding.modeAudioButton.id -> DownloadMode.AUDIO
+        binding.modeImageButton.id -> DownloadMode.IMAGE
+        else -> DownloadMode.VIDEO
+    }
+
+    private fun saveDownloadSettings() {
+        AppPreferences.store(this).edit {
+            putString(PREF_QUALITY, binding.qualityInput.text.toString())
+            putString(PREF_MODE, selectedMode().name)
+            putBoolean(PREF_COLLECTION, binding.playlistCheck.isChecked)
+        }
+    }
+
+    private fun updateLinkCount() {
+        val count = UrlTools.extract(binding.urlInput.text?.toString().orEmpty()).size
+        binding.linkCount.text = if (count == 0) "Desteklenen bir HTTPS bağlantısı ekleyin." else "$count benzersiz bağlantı • En fazla 100 bağlantı"
     }
 
     private fun observeDownloadState() {
@@ -115,42 +178,56 @@ class MainActivity : AppCompatActivity() {
         statusDetail.text = state.detail
         progressBar.setProgressCompat(state.progress, true)
         logText.text = state.logLines.joinToString("\n")
-        startButton.isEnabled = !state.running
+        startButton.isEnabled = !state.running && !sessionBusy
         cancelButton.isEnabled = state.running
         urlInput.isEnabled = !state.running
         pasteButton.isEnabled = !state.running
         clearButton.isEnabled = !state.running
         modeGroup.isEnabled = !state.running
+        listOf(modeVideoButton, modeAudioButton, modeImageButton).forEach { it.isEnabled = !state.running }
         playlistCheck.isEnabled = !state.running
         qualityInputLayout.isEnabled = !state.running && modeGroup.checkedButtonId == modeVideoButton.id
-        sessionButton.isEnabled = !state.running
-        deleteSessionButton.isEnabled = !state.running
+        sessionButton.isEnabled = !state.running && !sessionBusy
+        deleteSessionButton.isEnabled = !state.running && !sessionBusy
+        retryButton.visibility = if (!state.running && state.retryConfig != null) View.VISIBLE else View.GONE
+        retryButton.isEnabled = !sessionBusy
     }
 
     private fun startDownload() {
         val urls = UrlTools.extract(binding.urlInput.text?.toString().orEmpty())
         if (urls.isEmpty()) {
-            binding.urlInputLayout.error = "Geçerli bir http/https bağlantısı ekleyin."
+            binding.urlInputLayout.error = "Desteklenen platformlara ait geçerli bir HTTPS bağlantısı ekleyin."
+            return
+        }
+        if (urls.size > 100) {
+            binding.urlInputLayout.error = "Tek seferde en fazla 100 bağlantı ekleyebilirsiniz."
             return
         }
         binding.urlInputLayout.error = null
+        saveDownloadSettings()
+        launchDownload(
+            DownloadConfig(urls, selectedMode(), binding.qualityInput.text.toString(), binding.playlistCheck.isChecked),
+        )
+    }
+
+    private fun launchDownload(config: DownloadConfig) {
         if (DownloadStateStore.state.value.running) {
             toast("Bir indirme zaten devam ediyor.")
             return
         }
-        val mode = when (binding.modeGroup.checkedButtonId) {
-            binding.modeAudioButton.id -> DownloadMode.AUDIO
-            binding.modeImageButton.id -> DownloadMode.IMAGE
-            else -> DownloadMode.VIDEO
-        }
         val serviceIntent = Intent(this, DownloadService::class.java).apply {
             action = DownloadService.ACTION_START
-            putStringArrayListExtra(DownloadService.EXTRA_URLS, ArrayList(urls))
-            putExtra(DownloadService.EXTRA_MODE, mode.name)
-            putExtra(DownloadService.EXTRA_QUALITY, binding.qualityInput.text.toString())
-            putExtra(DownloadService.EXTRA_COLLECTION, binding.playlistCheck.isChecked)
+            putStringArrayListExtra(DownloadService.EXTRA_URLS, ArrayList(config.urls))
+            putExtra(DownloadService.EXTRA_MODE, config.mode.name)
+            putExtra(DownloadService.EXTRA_QUALITY, config.quality)
+            putExtra(DownloadService.EXTRA_COLLECTION, config.includeCollection)
         }
-        ContextCompat.startForegroundService(this, serviceIntent)
+        try {
+            ContextCompat.startForegroundService(this, serviceIntent)
+        } catch (_: Exception) {
+            DownloadStateStore.fail("İndirme başlatılamadı. Uygulamayı açık tutup yeniden deneyin.", config)
+            return
+        }
         binding.startButton.isEnabled = false
         binding.statusText.setText(R.string.status_service_starting)
         binding.statusDetail.setText(R.string.status_engine_preparing)
@@ -169,35 +246,64 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openSession() {
-        val platform = currentPlatform()
-        if (platform == null) {
-            toast("Önce TikTok, Instagram, X, Facebook, Reddit veya Threads bağlantısı ekleyin.")
-            return
+        val platforms = UrlTools.extract(binding.urlInput.text?.toString().orEmpty())
+            .mapNotNull(SessionPlatform::fromUrl).distinct()
+        if (platforms.size == 1) {
+            startActivity(LoginActivity.intent(this, platforms.first()))
+        } else {
+            choosePlatform(SessionPlatform.entries.toList(), "Hangi platformda oturum açalım?") {
+                startActivity(LoginActivity.intent(this, it))
+            }
         }
-        startActivity(LoginActivity.intent(this, platform))
     }
 
     private fun deleteSession() {
-        val platform = currentPlatform()
-        if (platform == null || !SessionCookieStore.hasSession(this, platform)) {
+        val saved = SessionPlatform.entries.filter { SessionCookieStore.hasSession(this, it) }
+        if (saved.isEmpty()) {
             toast("Silinecek kayıtlı oturum yok.")
             return
         }
-        SessionCookieStore.delete(this, platform)
-        updateSessionStatus()
-        toast("${platform.displayName} oturumu silindi.")
+        val selected = currentPlatform()?.takeIf { it in saved }
+        if (selected != null) removeSession(selected)
+        else choosePlatform(saved, "Silinecek oturumu seçin", ::removeSession)
+    }
+
+    private fun removeSession(platform: SessionPlatform) {
+        sessionBusy = true
+        render(DownloadStateStore.state.value)
+        SessionCookieStore.delete(this, platform) { removed ->
+            sessionBusy = false
+            if (!isFinishing && !isDestroyed) {
+                updateSessionStatus()
+                render(DownloadStateStore.state.value)
+                toast(if (removed) "${platform.displayName} oturumu silindi." else "Oturum dosyası silinemedi. Yeniden deneyin.")
+            }
+        }
+    }
+
+    private fun choosePlatform(platforms: List<SessionPlatform>, title: String, select: (SessionPlatform) -> Unit) {
+        val labels = platforms.map {
+            it.displayName + if (SessionCookieStore.hasSession(this, it)) " • Kayıtlı" else ""
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setItems(labels.toTypedArray()) { _, index -> select(platforms[index]) }
+            .setNegativeButton("Vazgeç", null)
+            .show()
     }
 
     private fun updateSessionStatus() {
         if (!::binding.isInitialized) return
         val platform = currentPlatform()
         val hasSession = platform?.let { SessionCookieStore.hasSession(this, it) } == true
+        val saved = SessionPlatform.entries.filter { SessionCookieStore.hasSession(this, it) }
         binding.sessionStatus.text = when {
+            platform == null && saved.isNotEmpty() -> "Kayıtlı: ${saved.joinToString { it.displayName }}"
             platform == null -> getString(R.string.session_none)
             hasSession -> getString(R.string.session_saved, platform.displayName)
             else -> "${platform.displayName} için oturum gerekirse giriş yapın"
         }
-        binding.deleteSessionButton.visibility = if (hasSession) android.view.View.VISIBLE else android.view.View.GONE
+        binding.deleteSessionButton.visibility = if (hasSession || (platform == null && saved.isNotEmpty())) View.VISIBLE else View.GONE
     }
 
     private fun currentPlatform(): SessionPlatform? {
@@ -209,6 +315,10 @@ class MainActivity : AppCompatActivity() {
         if (intent?.action != Intent.ACTION_SEND || intent.type != "text/plain") return
         val shared = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
         if (shared.isNotBlank()) {
+            if (DownloadStateStore.state.value.running) {
+                toast("İndirme devam ediyor. Yeni bağlantıyı işlem bitince paylaşın.")
+                return
+            }
             binding.urlInput.setText(shared)
             binding.urlInput.setSelection(shared.length)
         }
@@ -228,6 +338,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyTheme(theme: AppThemePalette) = with(binding) {
+        AppAppearance.applyWindow(this@MainActivity, theme)
+        root.setBackgroundColor(theme.background)
         rootContainer.setBackgroundColor(theme.background)
         listOf(linkPanel, settingsPanel, statusPanel).forEach {
             it.background = rounded(theme.panel, theme.border, 16)
@@ -236,8 +348,8 @@ class MainActivity : AppCompatActivity() {
         watermarkNote.background = rounded(theme.accentDark, theme.accent, 12)
 
         listOf(appTitle, statusText, sessionTitle).forEach { it.setTextColor(theme.primaryText) }
-        listOf(appSubtitle, statusDetail, sessionStatus, playlistCheck).forEach { it.setTextColor(theme.secondaryText) }
-        listOf(platformText, logText, legalText).forEach { it.setTextColor(theme.faintText) }
+        listOf(appSubtitle, statusDetail, sessionStatus, playlistCheck, linkCount).forEach { it.setTextColor(theme.secondaryText) }
+        listOf(platformText, logText, legalText, engineVersion).forEach { it.setTextColor(theme.faintText) }
         listOf(linksTitle, settingsTitle, watermarkNote).forEach { it.setTextColor(theme.accent) }
 
         styleInput(urlInputLayout, theme)
@@ -246,6 +358,9 @@ class MainActivity : AppCompatActivity() {
         listOf(urlInput, themeInput, qualityInput).forEach {
             it.setTextColor(theme.primaryText)
             it.setHintTextColor(theme.faintText)
+        }
+        listOf(themeInput, qualityInput).forEach {
+            it.setDropDownBackgroundDrawable(rounded(theme.panelAlt, theme.border, 12))
         }
 
         listOf(modeVideoButton, modeAudioButton, modeImageButton, pasteButton, cancelButton).forEach {
@@ -262,6 +377,9 @@ class MainActivity : AppCompatActivity() {
         styleButton(clearButton, theme.secondaryText, theme.border, null)
         styleButton(deleteSessionButton, theme.error, theme.error, null)
         styleButton(startButton, theme.background, theme.accent, theme.accent)
+        styleButton(retryButton, theme.accent, theme.accent, null)
+        styleButton(downloadsButton, theme.accent, theme.border, null)
+        styleButton(logToggleButton, theme.secondaryText, theme.border, null)
         cancelButton.setTextColor(theme.error)
         cancelButton.strokeColor = ColorStateList.valueOf(theme.error)
 
@@ -274,6 +392,24 @@ class MainActivity : AppCompatActivity() {
         input.boxBackgroundColor = theme.panelAlt
         input.setBoxStrokeColor(theme.border)
         input.defaultHintTextColor = ColorStateList.valueOf(theme.secondaryText)
+        input.setEndIconTintList(ColorStateList.valueOf(theme.secondaryText))
+        input.setErrorTextColor(ColorStateList.valueOf(theme.error))
+    }
+
+    private fun themedAdapter(items: List<String>) = object : ArrayAdapter<String>(
+        this, android.R.layout.simple_list_item_1, items,
+    ) {
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+            super.getView(position, convertView, parent).also { styleMenuRow(it) }
+
+        override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View =
+            super.getDropDownView(position, convertView, parent).also { styleMenuRow(it) }
+
+        private fun styleMenuRow(view: View) {
+            val theme = AppPreferences.theme(this@MainActivity)
+            (view as? TextView)?.setTextColor(theme.primaryText)
+            view.setBackgroundColor(theme.panelAlt)
+        }
     }
 
     private fun styleButton(
@@ -294,6 +430,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-        private const val PREF_THEME_ID = "theme_id"
+        private const val PREF_QUALITY = "download_quality"
+        private const val PREF_MODE = "download_mode"
+        private const val PREF_COLLECTION = "download_collection"
     }
 }

@@ -7,13 +7,14 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Environment
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import java.io.File
-import java.net.URI
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -26,6 +27,8 @@ class DownloadService : Service() {
     @Volatile private var activeProcessId: String? = null
     @Volatile private var lastNotificationUpdate = 0L
     private var ffmpegInitialized = false
+    @Volatile private var timedOut = false
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
@@ -39,7 +42,7 @@ class DownloadService : Service() {
             }
 
             ACTION_START -> {
-                if (!startDownload(intent, startId)) stopSelf(startId)
+                if (!startDownload(intent)) stopSelf(startId)
             }
 
             else -> if (!busy.get()) stopSelf(startId)
@@ -50,21 +53,28 @@ class DownloadService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        cancelled.set(true)
         activeProcessId?.let { YoutubeDL.getInstance().destroyProcessById(it) }
         executor.shutdownNow()
         super.onDestroy()
     }
 
     override fun onTimeout(startId: Int, fgsType: Int) {
+        timedOut = true
         cancelled.set(true)
         activeProcessId?.let { YoutubeDL.getInstance().destroyProcessById(it) }
         DownloadStateStore.fail("Android arka plan süresi dolduğu için indirme durduruldu.")
         stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf(startId)
+        stopSelf()
     }
 
-    private fun startDownload(intent: Intent, startId: Int): Boolean {
+    private fun startDownload(intent: Intent): Boolean {
+        if (busy.get()) {
+            DownloadStateStore.appendLog("Bir indirme zaten devam ediyor; ikinci istek atlandı.")
+            return true
+        }
         val urls = intent.getStringArrayListExtra(EXTRA_URLS).orEmpty()
+            .flatMap(UrlTools::extract).distinct().take(100)
         if (urls.isEmpty()) return false
         if (!busy.compareAndSet(false, true)) {
             DownloadStateStore.appendLog("Bir indirme zaten devam ediyor; ikinci istek atlandı.")
@@ -80,22 +90,30 @@ class DownloadService : Service() {
             includeCollection = intent.getBooleanExtra(EXTRA_COLLECTION, false),
         )
         cancelled.set(false)
+        timedOut = false
         DownloadStateStore.resetForStart(urls.size)
-        startForeground(
-            NOTIFICATION_ID,
-            buildNotification(0, getString(R.string.notification_preparing), true),
-        )
-        executor.execute { runDownload(config, startId) }
+        try {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(0, getString(R.string.notification_preparing), true),
+            )
+            executor.execute { runDownload(config) }
+        } catch (_: Exception) {
+            busy.set(false)
+            DownloadStateStore.fail("İndirme servisi başlatılamadı. Uygulamayı açıp yeniden deneyin.", config)
+            return false
+        }
         return true
     }
 
-    private fun runDownload(config: DownloadConfig, startId: Int) {
+    private fun runDownload(config: DownloadConfig) {
         val root = File(
-            getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
-            "jobs/${System.currentTimeMillis()}",
+            getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir,
+            "jobs/${UUID.randomUUID()}",
         )
         var publishedFiles = 0
-        var activeUrl = ""
+        val failedUrls = mutableListOf<String>()
+        var lastFailure = ""
         var outcome: JobOutcome = JobOutcome.Cancelled
         try {
             if (!root.mkdirs() && !root.isDirectory) {
@@ -104,83 +122,31 @@ class DownloadService : Service() {
             initializeEngine()
 
             config.urls.forEachIndexed { index, url ->
-                activeUrl = url
                 checkCancelled()
-                val sessionPlatform = SessionPlatform.fromUrl(url)
-                val preferCombinedVideo = sessionPlatform == SessionPlatform.TIKTOK
-                if (config.mode == DownloadMode.AUDIO ||
-                    (config.mode == DownloadMode.VIDEO && !preferCombinedVideo)
-                ) {
-                    initializeFfmpeg()
-                }
-                val itemDirectory = File(root, "item-${index + 1}").apply { mkdirs() }
-                val output = File(itemDirectory, "%(title).150B [%(id)s].%(ext)s").absolutePath
-                val cookieFile = SessionCookieStore.fileForUrl(this, url)?.absolutePath
-                val request = YoutubeDLRequest(url)
-                DownloadCommandBuilder.apply(
-                    request,
-                    DownloadCommandBuilder.options(
-                        mode = config.mode,
-                        quality = config.quality,
-                        includeCollection = config.includeCollection,
-                        outputTemplate = output,
-                        cookieFile = cookieFile,
-                        preferCombinedVideo = preferCombinedVideo,
-                    ),
-                )
-
-                val platform = sessionPlatform?.displayName ?: "Bağlantı"
-                DownloadStateStore.appendLog("[${index + 1}/${config.urls.size}] ${safeHost(url)}")
-                DownloadStateStore.update(
-                    progress = index * 100 / config.urls.size,
-                    status = "$platform indiriliyor",
-                    detail = "Bağlantı ${index + 1}/${config.urls.size}",
-                )
-
-                val processId = "medya-${UUID.randomUUID()}"
-                var executeError: Throwable? = null
-                activeProcessId = processId
+                val itemDirectory = File(root, "item-${index + 1}")
                 try {
-                    YoutubeDL.getInstance().execute(request, processId) { progress, eta, line ->
-                        if (cancelled.get()) YoutubeDL.getInstance().destroyProcessById(processId)
-                        val localProgress = progress.coerceIn(0f, 100f)
-                        val overall = (((index + localProgress / 100f) / config.urls.size) * 100f)
-                            .roundToInt()
-                            .coerceIn(0, 100)
-                        val etaText = if (eta > 0) " • ${eta} sn kaldı" else ""
-                        DownloadStateStore.update(
-                            progress = overall,
-                            status = "$platform indiriliyor",
-                            detail = "%${localProgress.roundToInt()}$etaText",
-                        )
-                        if (line.isNotBlank()) DownloadStateStore.appendLog(sanitizeEngineLine(line))
-                        updateProgressNotification(overall, "$platform indiriliyor")
-                    }
-                } catch (error: Throwable) {
-                    executeError = error
+                    publishedFiles += downloadItem(config, index, url, itemDirectory)
+                } catch (error: Exception) {
+                    if (error is PartialPublishException) publishedFiles += error.publishedCount
+                    rethrowCancellation(error)
+                    failedUrls += url
+                    lastFailure = EngineErrors.friendly(error, url)
+                    DownloadStateStore.appendLog("${EngineErrors.safeHost(url)}: $lastFailure")
+                    DownloadStateStore.appendLog("Sıradaki bağlantıyla devam ediliyor.")
                 } finally {
-                    activeProcessId = null
+                    itemDirectory.deleteRecursively()
                 }
-
-                checkCancelled()
-                try {
-                    publishedFiles += MediaPublisher.publishAll(
-                        context = this,
-                        stagingDirectory = itemDirectory,
-                        allowEmpty = executeError != null,
-                        shouldCancel = cancelled::get,
-                    )
-                } catch (error: PartialPublishException) {
-                    publishedFiles += error.publishedCount
-                    throw error.cause ?: error
-                }
-                itemDirectory.deleteRecursively()
-                checkCancelled()
-                if (executeError != null) throw executeError
+                DownloadStateStore.update(progress = (index + 1) * 100 / config.urls.size)
             }
 
             checkCancelled()
-            outcome = JobOutcome.Success(publishedFiles)
+            val retryConfig = config.copy(urls = failedUrls.toList())
+            val summary = "${failedUrls.size} bağlantı tamamlanamadı. $lastFailure"
+            outcome = when {
+                failedUrls.isEmpty() -> JobOutcome.Success(publishedFiles)
+                publishedFiles > 0 -> JobOutcome.Partial(publishedFiles, summary, retryConfig)
+                else -> JobOutcome.Failure(summary, retryConfig)
+            }
         } catch (_: YoutubeDL.CanceledException) {
             outcome = JobOutcome.Cancelled
         } catch (_: MediaCopyCancelledException) {
@@ -188,27 +154,139 @@ class DownloadService : Service() {
         } catch (_: InterruptedException) {
             outcome = JobOutcome.Cancelled
             Thread.currentThread().interrupt()
-        } catch (error: Throwable) {
-            val message = friendlyError(error, activeUrl)
-            outcome = if (publishedFiles > 0) {
-                JobOutcome.Partial(publishedFiles, message)
-            } else {
-                JobOutcome.Failure(message)
-            }
+        } catch (error: Exception) {
+            outcome = JobOutcome.Failure(EngineErrors.friendly(error, ""), config)
         } finally {
             activeProcessId = null
             root.deleteRecursively()
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            applyOutcome(outcome)
-            busy.set(false)
-            stopSelfResult(startId)
+            val finalOutcome = outcome
+            val savedFiles = publishedFiles
+            mainHandler.post {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                if (!timedOut) applyOutcome(finalOutcome, savedFiles)
+                busy.set(false)
+                stopSelf()
+            }
+        }
+    }
+
+    private fun downloadItem(config: DownloadConfig, index: Int, url: String, directory: File): Int {
+        check(directory.mkdirs() || directory.isDirectory) { "Geçici indirme klasörü oluşturulamadı." }
+        val preferCombined = SessionPlatform.fromUrl(url) == SessionPlatform.TIKTOK
+        // Thumbnail conversion also needs FFmpeg. Combined TikTok MP4s do not.
+        if (config.mode != DownloadMode.VIDEO || !preferCombined) initializeFfmpeg()
+        val platform = SessionPlatform.fromUrl(url)?.displayName ?: "YouTube"
+        DownloadStateStore.appendLog("[${index + 1}/${config.urls.size}] ${EngineErrors.safeHost(url)}")
+        DownloadStateStore.update(
+            progress = index * 100 / config.urls.size,
+            status = "$platform indiriliyor",
+            detail = "Bağlantı ${index + 1}/${config.urls.size}",
+        )
+        var executeError: Exception? = null
+        try {
+            executeWithRetry(config, index, url, directory, platform, preferCombined)
+        } catch (error: Exception) {
+            rethrowCancellation(error)
+            executeError = error
+        }
+        checkCancelled()
+        val saved = MediaPublisher.publishAll(
+            context = this,
+            stagingDirectory = directory,
+            mode = config.mode,
+            allowEmpty = executeError != null,
+            shouldCancel = cancelled::get,
+        )
+        if (executeError != null) {
+            if (saved > 0) throw PartialPublishException(saved, executeError)
+            throw executeError
+        }
+        return saved
+    }
+
+    private fun executeWithRetry(
+        config: DownloadConfig,
+        index: Int,
+        url: String,
+        directory: File,
+        platform: String,
+        preferCombined: Boolean,
+    ) {
+        var attempt = 1
+        var compatibleVideo = false
+        while (true) {
+            checkCancelled()
+            val request = DownloadCommandBuilder.apply(
+                YoutubeDLRequest(url),
+                DownloadCommandBuilder.options(
+                    mode = config.mode,
+                    quality = config.quality,
+                    includeCollection = config.includeCollection,
+                    outputTemplate = File(directory, "%(title).150B [%(id)s].%(ext)s").absolutePath,
+                    cookieFile = SessionCookieStore.fileForUrl(this, url)?.absolutePath,
+                    preferCombinedVideo = preferCombined,
+                    compatibleVideo = compatibleVideo,
+                ),
+            )
+            val processId = "medya-${UUID.randomUUID()}"
+            activeProcessId = processId
+            try {
+                YoutubeDL.getInstance().execute(request, processId) { progress, eta, line ->
+                    if (cancelled.get()) YoutubeDL.getInstance().destroyProcessById(processId)
+                    val localProgress = if (progress.isFinite()) progress.coerceIn(0f, 100f) else 0f
+                    val overall = (((index + localProgress / 100f) / config.urls.size) * 100f)
+                        .roundToInt().coerceIn(0, 100)
+                    val etaText = if (eta > 0) " • ${eta} sn kaldı" else ""
+                    DownloadStateStore.update(
+                        progress = maxOf(DownloadStateStore.state.value.progress, overall),
+                        status = "$platform indiriliyor",
+                        detail = "${index + 1}/${config.urls.size} • %${localProgress.roundToInt()}$etaText",
+                    )
+                    if (line.isNotBlank()) DownloadStateStore.appendLog(EngineErrors.sanitize(line))
+                    updateProgressNotification(overall, "$platform indiriliyor")
+                }
+                return
+            } catch (error: Exception) {
+                rethrowCancellation(error)
+                when {
+                    config.mode == DownloadMode.VIDEO && !compatibleVideo && attempt < 3 &&
+                        EngineErrors.classify(error) == EngineFailure.FORMAT -> {
+                        compatibleVideo = true
+                        initializeFfmpeg()
+                        DownloadStateStore.appendLog("Kalite sınırı korunarak uyumlu biçim deneniyor.")
+                    }
+                    EngineErrors.shouldRetry(error, attempt) -> {
+                        DownloadStateStore.update(status = "Bağlantı yeniden deneniyor", detail = "Deneme ${attempt + 1}/3")
+                        DownloadStateStore.appendLog("Geçici ağ hatası. Deneme ${attempt + 1}/3...")
+                        repeat(attempt * 8) {
+                            checkCancelled()
+                            Thread.sleep(250)
+                        }
+                    }
+                    else -> throw error
+                }
+                attempt++
+            } finally {
+                activeProcessId = null
+            }
+        }
+    }
+
+    private fun rethrowCancellation(error: Exception) {
+        checkCancelled()
+        val cause = if (error is PartialPublishException) error.cause else error
+        when (cause) {
+            is YoutubeDL.CanceledException -> throw cause
+            is MediaCopyCancelledException -> throw cause
+            is InterruptedException -> throw cause
         }
     }
 
     private fun initializeEngine() {
         DownloadStateStore.update(status = "Motor hazırlanıyor", detail = "İlk açılış biraz sürebilir...")
-        YoutubeDL.getInstance().init(applicationContext)
-        DownloadStateStore.appendLog("APK içindeki sabit yt-dlp motoru hazır.")
+        BundledEngine.prepare(applicationContext)
+        checkCancelled()
+        DownloadStateStore.appendLog("Doğrulanmış yt-dlp ${BundledEngine.VERSION} motoru hazır.")
     }
 
     private fun initializeFfmpeg() {
@@ -229,7 +307,7 @@ class DownloadService : Service() {
         activeProcessId?.let { YoutubeDL.getInstance().destroyProcessById(it) }
     }
 
-    private fun applyOutcome(outcome: JobOutcome) {
+    private fun applyOutcome(outcome: JobOutcome, savedFiles: Int) {
         when (outcome) {
             is JobOutcome.Success -> {
                 DownloadStateStore.complete(outcome.files)
@@ -237,59 +315,21 @@ class DownloadService : Service() {
             }
 
             is JobOutcome.Partial -> {
-                DownloadStateStore.partial(outcome.files, outcome.message)
+                DownloadStateStore.partial(outcome.files, outcome.message, outcome.retryConfig)
                 showFinishedNotification(false, "${outcome.files} dosya kaydedildi; bazıları tamamlanamadı")
             }
 
             is JobOutcome.Failure -> {
-                DownloadStateStore.fail(outcome.message)
+                DownloadStateStore.fail(outcome.message, outcome.retryConfig)
                 showFinishedNotification(false, getString(R.string.notification_open_for_details))
             }
 
             JobOutcome.Cancelled -> {
-                DownloadStateStore.cancelled()
+                DownloadStateStore.cancelled(savedFiles)
                 showFinishedNotification(false, "İndirme iptal edildi")
             }
         }
     }
-
-    private fun friendlyError(error: Throwable, url: String): String {
-        val raw = generateSequence(error) { it.cause }
-            .mapNotNull { it.message }
-            .firstOrNull { it.isNotBlank() }
-            .orEmpty()
-        val lower = raw.lowercase()
-        val host = runCatching { URI(url).host.orEmpty().lowercase() }.getOrDefault("")
-        return when {
-            ("log in" in lower || "login" in lower || "sign in" in lower) &&
-                (host.endsWith("youtube.com") || host == "youtu.be") ->
-                "YouTube ek doğrulama istedi. Bir süre sonra veya farklı ağda yeniden deneyin."
-            "log in" in lower || "login" in lower || "sign in" in lower ->
-                "Bu içerik oturum istiyor. Bağlantıyı ekleyip 'Oturum Aç' ile platforma giriş yapın."
-            "private" in lower -> "İçerik gizli veya hesabınızın erişim izni yok."
-            "requested format" in lower -> "Seçilen kalite bulunamadı. 'En iyi' kalitesini deneyin."
-            "unsupported url" in lower -> "Bu bağlantı şu anda desteklenmiyor."
-            "429" in lower -> "Platform geçici istek sınırı uyguladı. Bir süre sonra yeniden deneyin."
-            "403" in lower || "forbidden" in lower -> "Platform erişimi reddetti. Oturum açıp yeniden deneyin."
-            raw.isBlank() -> "İndirme motoru işlemi tamamlayamadı."
-            else -> sanitizeEngineLine(raw.lineSequence().lastOrNull { it.isNotBlank() }.orEmpty())
-                .ifBlank { "İndirme motoru işlemi tamamlayamadı." }
-        }
-    }
-
-    private fun safeHost(url: String): String = runCatching {
-        URI(url).host.orEmpty().lowercase().ifBlank { "desteklenen platform" }
-    }.getOrDefault("desteklenen platform")
-
-    private fun sanitizeEngineLine(line: String): String = line
-        .replace(Regex("""https?://[^\s<>"']+""", RegexOption.IGNORE_CASE)) { match ->
-            "https://${safeHost(match.value)}/…"
-        }
-        .replace(
-            Regex("""(?i)\b(token|auth|cookie|session|password|signature|sig)=\S+"""),
-            "${'$'}1=<gizli>",
-        )
-        .takeLast(220)
 
     private fun createNotificationChannel() {
         val manager = getSystemService(NotificationManager::class.java)
@@ -359,8 +399,8 @@ class DownloadService : Service() {
 
     private sealed interface JobOutcome {
         data class Success(val files: Int) : JobOutcome
-        data class Partial(val files: Int, val message: String) : JobOutcome
-        data class Failure(val message: String) : JobOutcome
+        data class Partial(val files: Int, val message: String, val retryConfig: DownloadConfig) : JobOutcome
+        data class Failure(val message: String, val retryConfig: DownloadConfig) : JobOutcome
         data object Cancelled : JobOutcome
     }
 

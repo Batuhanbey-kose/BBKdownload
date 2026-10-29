@@ -27,6 +27,7 @@ data class DownloadUiState(
     val logLines: List<String> = emptyList(),
     val completedFiles: Int = 0,
     val error: Boolean = false,
+    val retryConfig: DownloadConfig? = null,
 )
 
 object DownloadStateStore {
@@ -71,24 +72,26 @@ object DownloadStateStore {
                 detail = "$files dosya İndirilenler/BBKdownload klasörüne kaydedildi.",
                 completedFiles = files,
                 error = false,
+                retryConfig = null,
             )
         }
         appendLog("Tüm bağlantılar başarıyla tamamlandı.")
     }
 
-    fun fail(message: String) {
+    fun fail(message: String, retryConfig: DownloadConfig? = null) {
         mutableState.update {
             it.copy(
                 running = false,
                 status = "İndirme tamamlanamadı",
                 detail = message,
                 error = true,
+                retryConfig = retryConfig,
             )
         }
         appendLog(message)
     }
 
-    fun partial(files: Int, message: String) {
+    fun partial(files: Int, message: String, retryConfig: DownloadConfig? = null) {
         mutableState.update {
             it.copy(
                 running = false,
@@ -96,18 +99,21 @@ object DownloadStateStore {
                 detail = "$files dosya kaydedildi. $message",
                 completedFiles = files,
                 error = true,
+                retryConfig = retryConfig,
             )
         }
         appendLog("$files dosya kaydedildi; bazı öğeler tamamlanamadı.")
     }
 
-    fun cancelled() {
+    fun cancelled(files: Int = 0) {
         mutableState.update {
             it.copy(
                 running = false,
                 status = "İşlem iptal edildi",
-                detail = "Geçici dosyalar temizlendi.",
+                detail = if (files > 0) "$files dosya kaydedildi. Kalan geçici dosyalar temizlendi." else "Geçici dosyalar temizlendi.",
+                completedFiles = files,
                 error = false,
+                retryConfig = null,
             )
         }
         appendLog("İndirme kullanıcı tarafından iptal edildi.")
@@ -149,14 +155,19 @@ object DownloadCommandBuilder {
         outputTemplate: String,
         cookieFile: String?,
         preferCombinedVideo: Boolean = false,
+        compatibleVideo: Boolean = false,
     ): List<CommandOption> = buildList {
         add(CommandOption("--newline"))
         add(CommandOption("--no-mtime"))
         add(CommandOption("--no-overwrites"))
+        add(CommandOption("--continue"))
+        add(CommandOption("--abort-on-unavailable-fragments"))
         add(CommandOption("--trim-filenames", "180"))
         add(CommandOption("--retries", "5"))
         add(CommandOption("--fragment-retries", "5"))
         add(CommandOption("--socket-timeout", "30"))
+        add(CommandOption("--retry-sleep", "http:exp=1:8"))
+        add(CommandOption("--retry-sleep", "fragment:exp=1:8"))
         add(CommandOption("-o", outputTemplate))
 
         if (includeCollection) {
@@ -170,7 +181,7 @@ object DownloadCommandBuilder {
 
         when (mode) {
             DownloadMode.VIDEO -> {
-                add(CommandOption("-f", videoFormat(quality, preferCombinedVideo)))
+                add(CommandOption("-f", videoFormat(quality, preferCombinedVideo, compatibleVideo)))
                 add(CommandOption("--merge-output-format", "mp4"))
             }
 
@@ -197,7 +208,11 @@ object DownloadCommandBuilder {
         return request
     }
 
-    internal fun videoFormat(quality: String, preferCombined: Boolean = false): String {
+    internal fun videoFormat(
+        quality: String,
+        preferCombined: Boolean = false,
+        compatible: Boolean = false,
+    ): String {
         val height = when (quality) {
             "2160p" -> 2160
             "1440p" -> 1440
@@ -206,11 +221,15 @@ object DownloadCommandBuilder {
             "480p" -> 480
             else -> null
         }
+        if (compatible) {
+            return if (height == null) "bestvideo*+bestaudio/best"
+            else "bestvideo*[height<=$height]+bestaudio/best[height<=$height]"
+        }
         if (preferCombined) {
             return if (height == null) {
                 "best[ext=mp4]/best"
             } else {
-                "best[height<=$height][ext=mp4]/best[height<=$height]/best[ext=mp4]/best"
+                "best[height<=$height][ext=mp4]/best[height<=$height]"
             }
         }
         return if (height == null) {
